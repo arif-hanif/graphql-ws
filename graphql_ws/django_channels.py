@@ -1,43 +1,33 @@
-from channels.generic.websockets import JsonWebsocketConsumer
-from .base import BaseConnectionContext
 import json
-from graphql.execution.executors.sync import SyncExecutor
-from .base import (
-    ConnectionClosedException,
-    BaseConnectionContext,
-    BaseSubscriptionServer
-)
-from .constants import (
-    GQL_CONNECTION_ACK,
-    GQL_CONNECTION_ERROR
-)
-from django.conf import settings
-from rx import Observer, Observable
-from django.conf import settings
+
+from channels.generic.websockets import JsonWebsocketConsumer
 from graphene_django.settings import graphene_settings
+from graphql.execution.executors.sync import SyncExecutor
+from rx import Observable, Observer
+
+from .base import BaseConnectionContext, BaseSubscriptionServer
+from .constants import GQL_CONNECTION_ACK, GQL_CONNECTION_ERROR
+
 
 class DjangoChannelConnectionContext(BaseConnectionContext):
-    
-    def __init__(self, message, request_context = None):
+    def __init__(self, message, request_context=None):
         self.message = message
         self.operations = {}
         self.request_context = request_context
 
     def send(self, data):
         self.message.reply_channel.send(data)
-    
+
     def close(self, reason):
-        data = {
-            'close': True,
-            'text': reason
-        }
+        data = {"close": True, "text": reason}
         self.message.reply_channel.send(data)
 
-class DjangoChannelSubscriptionServer(BaseSubscriptionServer):
 
+class DjangoChannelSubscriptionServer(BaseSubscriptionServer):
     def get_graphql_params(self, *args, **kwargs):
-        params = super(DjangoChannelSubscriptionServer,
-                       self).get_graphql_params(*args, **kwargs)
+        params = super(DjangoChannelSubscriptionServer, self).get_graphql_params(
+            *args, **kwargs
+        )
         return dict(params, executor=SyncExecutor())
 
     def handle(self, message, connection_context):
@@ -72,17 +62,19 @@ class DjangoChannelSubscriptionServer(BaseSubscriptionServer):
 
     def on_start(self, connection_context, op_id, params):
         try:
-            execution_result = self.execute(
-                connection_context.request_context, params)
+            execution_result = self.execute(connection_context.request_context, params)
             assert isinstance(
-                execution_result, Observable), "A subscription must return an observable"
-            execution_result.subscribe(SubscriptionObserver(
-                connection_context,
-                op_id,
-                self.send_execution_result,
-                self.send_error,
-                self.on_close
-            ))
+                execution_result, Observable
+            ), "A subscription must return an observable"
+            execution_result.subscribe(
+                SubscriptionObserver(
+                    connection_context,
+                    op_id,
+                    self.send_execution_result,
+                    self.send_error,
+                    self.on_close,
+                )
+            )
         except Exception as e:
             self.send_error(connection_context, op_id, str(e))
 
@@ -102,20 +94,23 @@ class GraphQLSubscriptionConsumer(JsonWebsocketConsumer):
     def connect(self, message, **kwargs):
         message.reply_channel.send({"accept": True})
 
-
     def receive(self, content, **kwargs):
         """
         Called when a message is received with either text or bytes
         filled out.
         """
         self.connection_context = DjangoChannelConnectionContext(self.message)
-        self.subscription_server = DjangoChannelSubscriptionServer(graphene_settings.SCHEMA)
+        self.subscription_server = DjangoChannelSubscriptionServer(
+            graphene_settings.SCHEMA
+        )
         self.subscription_server.on_open(self.connection_context)
         self.subscription_server.handle(content, self.connection_context)
 
-class SubscriptionObserver(Observer):
 
-    def __init__(self, connection_context, op_id, send_execution_result, send_error, on_close):
+class SubscriptionObserver(Observer):
+    def __init__(
+        self, connection_context, op_id, send_execution_result, send_error, on_close
+    ):
         self.connection_context = connection_context
         self.op_id = op_id
         self.send_execution_result = send_execution_result

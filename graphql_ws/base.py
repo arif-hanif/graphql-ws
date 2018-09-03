@@ -1,18 +1,17 @@
 import json
 from collections import OrderedDict
 
-from graphql import graphql, format_error
-from graphql.execution import ExecutionResult
+from graphql import format_error, graphql
 
-from .constants import (
+from .constants import (  # noqa: F401
+    GQL_COMPLETE,
+    GQL_CONNECTION_ERROR,
     GQL_CONNECTION_INIT,
     GQL_CONNECTION_TERMINATE,
+    GQL_DATA,
+    GQL_ERROR,
     GQL_START,
     GQL_STOP,
-    GQL_COMPLETE,
-    GQL_ERROR,
-    GQL_CONNECTION_ERROR,
-    GQL_DATA
 )
 
 
@@ -53,7 +52,6 @@ class BaseConnectionContext(object):
 
 
 class BaseSubscriptionServer(object):
-
     def __init__(self, schema, keep_alive=True):
         self.schema = schema
         self.keep_alive = keep_alive
@@ -93,7 +91,9 @@ class BaseSubscriptionServer(object):
             params = self.get_graphql_params(connection_context, payload)
             if not isinstance(params, dict):
                 error = Exception(
-                    "Invalid params returned from get_graphql_params! return values must be a dict.")
+                    "Invalid params returned from get_graphql_params! "
+                    "return values must be a dict."
+                )
                 return self.send_error(connection_context, op_id, error)
 
             # If we already have a subscription with this id, unsubscribe from
@@ -107,8 +107,11 @@ class BaseSubscriptionServer(object):
             return self.on_stop(connection_context, op_id)
 
         else:
-            return self.send_error(connection_context, op_id,
-                                   Exception('Invalid message type: {}.'.format(op_type)))
+            return self.send_error(
+                connection_context,
+                op_id,
+                Exception("Invalid message type: {}.".format(op_type)),
+            )
 
     def send_execution_result(self, connection_context, op_id, execution_result):
         result = self.execution_result_to_dict(execution_result)
@@ -119,8 +122,9 @@ class BaseSubscriptionServer(object):
         if execution_result.data:
             result['data'] = execution_result.data
         if execution_result.errors:
-            result['errors'] = [format_error(error)
-                                for error in execution_result.errors]
+            result["errors"] = [
+                format_error(error) for error in execution_result.errors
+            ]
         return result
 
     def send_message(self, connection_context, op_id=None, op_type=None, payload=None):
@@ -145,16 +149,9 @@ class BaseSubscriptionServer(object):
             ' GQL_CONNECTION_ERROR or GQL_ERROR'
         )
 
-        error_payload = {
-            'message': str(error)
-        }
+        error_payload = {"message": str(error)}
 
-        return self.send_message(
-            connection_context,
-            op_id,
-            error_type,
-            error_payload
-        )
+        return self.send_message(connection_context, op_id, error_type, error_payload)
 
     def unsubscribe(self, connection_context, op_id):
         if connection_context.has_operation(op_id):
@@ -171,8 +168,7 @@ class BaseSubscriptionServer(object):
         return connection_context.close(1011)
 
     def execute(self, request_context, params):
-        return graphql(
-            self.schema, **dict(params, allow_subscriptions=True))
+        return graphql(self.schema, **dict(params, allow_subscriptions=True))
 
     def handle(self, ws, request_context=None):
         raise NotImplementedError("handle method not implemented")
@@ -181,8 +177,7 @@ class BaseSubscriptionServer(object):
         try:
             if not isinstance(message, dict):
                 parsed_message = json.loads(message)
-                assert isinstance(
-                    parsed_message, dict), "Payload must be an object."
+                assert isinstance(parsed_message, dict), "Payload must be an object."
             else:
                 parsed_message = message
         except Exception as e:

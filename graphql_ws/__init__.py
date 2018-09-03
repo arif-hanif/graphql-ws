@@ -7,4 +7,4 @@ __email__ = "me@syrusakbary.com"
 __version__ = "0.2.0"
 
 
-from .base import BaseConnectionContext, BaseSubscriptionServer
+from .base import BaseConnectionContext, BaseSubscriptionServer  # noqa: F401

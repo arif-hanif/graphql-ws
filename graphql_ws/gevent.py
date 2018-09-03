@@ -1,23 +1,17 @@
 from __future__ import absolute_import
 
-import json
-
-from graphql import format_error, graphql
 from graphql.execution.executors.sync import SyncExecutor
-from rx import Observer, Observable
+from rx import Observable, Observer
+
 from .base import (
-    ConnectionClosedException,
     BaseConnectionContext,
-    BaseSubscriptionServer
+    BaseSubscriptionServer,
+    ConnectionClosedException,
 )
-from .constants import (
-    GQL_CONNECTION_ACK,
-    GQL_CONNECTION_ERROR
-)
+from .constants import GQL_CONNECTION_ACK, GQL_CONNECTION_ERROR
 
 
 class GeventConnectionContext(BaseConnectionContext):
-
     def receive(self):
         msg = self.ws.receive()
         return msg
@@ -36,10 +30,10 @@ class GeventConnectionContext(BaseConnectionContext):
 
 
 class GeventSubscriptionServer(BaseSubscriptionServer):
-
     def get_graphql_params(self, *args, **kwargs):
-        params = super(GeventSubscriptionServer,
-                       self).get_graphql_params(*args, **kwargs)
+        params = super(GeventSubscriptionServer, self).get_graphql_params(
+            *args, **kwargs
+        )
         return dict(params, executor=SyncExecutor())
 
     def handle(self, ws, request_context=None):
@@ -77,17 +71,19 @@ class GeventSubscriptionServer(BaseSubscriptionServer):
 
     def on_start(self, connection_context, op_id, params):
         try:
-            execution_result = self.execute(
-                connection_context.request_context, params)
+            execution_result = self.execute(connection_context.request_context, params)
             assert isinstance(
-                execution_result, Observable), "A subscription must return an observable"
-            execution_result.subscribe(SubscriptionObserver(
-                connection_context,
-                op_id,
-                self.send_execution_result,
-                self.send_error,
-                self.on_close
-            ))
+                execution_result, Observable
+            ), "A subscription must return an observable"
+            execution_result.subscribe(
+                SubscriptionObserver(
+                    connection_context,
+                    op_id,
+                    self.send_execution_result,
+                    self.send_error,
+                    self.on_close,
+                )
+            )
         except Exception as e:
             self.send_error(connection_context, op_id, str(e))
 
@@ -96,8 +92,9 @@ class GeventSubscriptionServer(BaseSubscriptionServer):
 
 
 class SubscriptionObserver(Observer):
-
-    def __init__(self, connection_context, op_id, send_execution_result, send_error, on_close):
+    def __init__(
+        self, connection_context, op_id, send_execution_result, send_error, on_close
+    ):
         self.connection_context = connection_context
         self.op_id = op_id
         self.send_execution_result = send_execution_result
